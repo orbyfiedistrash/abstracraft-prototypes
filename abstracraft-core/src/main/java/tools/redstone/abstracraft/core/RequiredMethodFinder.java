@@ -36,11 +36,6 @@ public class RequiredMethodFinder {
 
     public RequiredMethodFinder() { }
 
-    static final Type TYPE_Optional = Type.getType(Optional.class);
-    static final String NAME_Optional = TYPE_Optional.getInternalName();
-    static final Type TYPE_Required = Type.getType(Required.class);
-    static final String NAME_Required = TYPE_Required.getInternalName();
-
     // Packed ASM method info
     record MethodInfo(int access, String name, String desc, String signature, String[] exceptions) { }
 
@@ -81,23 +76,22 @@ public class RequiredMethodFinder {
      */
     public MethodVisitor findRequiredMethodsForMethod(List<MethodDependency> list, MethodInfo methodInfo) {
         return new MethodVisitor(Opcodes.ASM9) {
-            /* Track the current compute stack */
-            Stack<Object> stack = new Stack<>();
-
-            @Override
-            public void visitLdcInsn(Object cst) {
-                stack.push(cst);
-            }
+            /* Track the current method interfaces on the compute stack */
+            Stack<Object> methodInterfaceStack = new Stack<>();
 
             @Override
             public void visitFieldInsn(int opcode, String owner, String name, String descriptor) {
-                stack.push(new FieldValue(Type.getType(descriptor), owner, name));
+                var type = Type.getType(descriptor);
+                if ((opcode == Opcodes.GETSTATIC || opcode == Opcodes.GETFIELD) &&
+                        isMethodInterface(type.getInternalName())) {
+                    methodInterfaceStack.push(new FieldValue(Type.getType(descriptor), owner, name));
+                }
             }
 
             @Override
             public void visitMethodInsn(int opcode, String owner, String name, String desc, boolean itf) {
                 if (isMethodInterface(owner) && "call".equals(name)) {
-                    var field = (FieldValue) stack.pop();
+                    var field = (FieldValue) methodInterfaceStack.pop();
                     list.add(new MethodDependency(field.owner, field.name));
                 }
             }

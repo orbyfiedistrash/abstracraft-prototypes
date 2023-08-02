@@ -27,7 +27,9 @@ public class MethodDependency {
             return field;
 
         try {
-            return this.field = ReflectUtil.getClass(fieldOwner).getDeclaredField(fieldName);
+            return this.field = ReflectUtil
+                    .getClass(fieldOwner.replace('/', '.'))
+                    .getDeclaredField(fieldName);
         } catch (Exception e) {
             return this.field = null;
         }
