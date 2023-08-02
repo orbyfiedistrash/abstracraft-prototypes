@@ -3,6 +3,7 @@ package tools.redstone.abstracraft.core;
 import org.objectweb.asm.*;
 
 import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * Analyzes bytecode of a class to determine the methods required.
@@ -21,10 +22,14 @@ public class RequiredMethodFinder {
     public static byte[] transformClass(byte[] in) {
         ClassReader reader = new ClassReader(in);
         ClassWriter writer = new ClassWriter(reader, 0);
+        transformClass(reader, writer);
+        return writer.toByteArray();
+    }
+
+    public static void transformClass(ClassReader reader, ClassWriter writer) {
         var detector = new RequiredMethodFinder(reader);
         var list = detector.findRequiredDependenciesForClass();
         detector.auditClassWithDependencies(writer, list);
-        return writer.toByteArray();
     }
 
     static Map<String, Boolean> isMethodTypeCache = new HashMap<>();
@@ -35,7 +40,8 @@ public class RequiredMethodFinder {
             return b;
 
         try {
-            isMethodTypeCache.put(name, b = RawOptionalMethod.class.isAssignableFrom(Class.forName(name)));
+            isMethodTypeCache.put(name, b = RawOptionalMethod.class.isAssignableFrom(
+                    Class.forName(name.replace('/', '.'))));
             return b;
         } catch (ClassNotFoundException e) {
             return false;
