@@ -1,14 +1,10 @@
 package test.abstracraft.core;
 
-import org.objectweb.asm.Type;
-import tools.redstone.abstracraft.core.*;
-import tools.redstone.abstracraft.core.analysis.AnalysisContext;
-import tools.redstone.abstracraft.core.analysis.ClassDependencyAnalyzer;
-import tools.redstone.abstracraft.core.analysis.DependencyAnalysisHook;
-import tools.redstone.abstracraft.core.analysis.ReferenceInfo;
-import tools.redstone.abstracraft.core.usage.Abstraction;
-import tools.redstone.abstracraft.core.usage.Usage;
-import tools.redstone.abstracraft.core.util.ASMUtil;
+import tools.redstone.abstracraft.AbstractionProvider;
+import tools.redstone.abstracraft.analysis.*;
+import tools.redstone.abstracraft.usage.Abstraction;
+import tools.redstone.abstracraft.usage.Usage;
+import tools.redstone.abstracraft.util.asm.ASMUtil;
 
 import java.util.*;
 
@@ -54,15 +50,13 @@ public class ArgumentHookTest {
         }
     }
 
-    public static class MyHook implements DependencyAnalysisHook {
-        static final String NAME_CommandContext = Type.getType(CommandContext.class).getInternalName();
-
+    public static class ArgumentUsageHook implements ClassAnalysisHook {
         // Registers whether fields should be registered or not
         final Set<ReferenceInfo> excludeFields = new HashSet<>();
 
         final Map<ReferenceInfo, ReferenceHook> referenceHooksByField = new HashMap<>();
 
-        public ReferenceHook refHook(AnalysisContext context, ClassDependencyAnalyzer.ReferenceAnalysis called, boolean optional) {
+        public ReferenceHook refHook(AnalysisContext context, ReferenceAnalysis called, boolean optional) {
             if (!called.isField())
                 return null;
             ReferenceInfo fieldInfo = called.ref;
@@ -92,7 +86,8 @@ public class ArgumentHookTest {
 
                 @Override
                 public void optionalBlockDiscarded(AnalysisContext context) {
-                    referenceCounter -= 2;
+                    referenceCounter -= 2; // usages in optionally() blocks call both
+                                           // referenceRequired() and referenceOptional()
                 }
 
                 @Override
@@ -106,12 +101,12 @@ public class ArgumentHookTest {
         }
 
         @Override
-        public ReferenceHook optionalReference(AnalysisContext context, ClassDependencyAnalyzer.ReferenceAnalysis called) {
+        public ReferenceHook optionalReference(AnalysisContext context, ReferenceAnalysis called) {
             return refHook(context, called, true);
         }
 
         @Override
-        public ReferenceHook requiredReference(AnalysisContext context, ClassDependencyAnalyzer.ReferenceAnalysis called) {
+        public ReferenceHook requiredReference(AnalysisContext context, ReferenceAnalysis called) {
             return refHook(context, called, false);
         }
     }
@@ -143,9 +138,11 @@ public class ArgumentHookTest {
         }
     }
 
-    @TestSystem.Test(testClass = "TestClass", abstractionImpl = "CommandContextImpl", hooks = {"MyHook"})
-    void test_ArgHook(MyHook hook, Tests tests, CommandContext ctx, AbstractionManager abstractionManager) {
-        System.out.println("Exclude Argument fields: " + hook.excludeFields);
+    @TestSystem.Test(testClass = "TestClass", abstractionImpl = "CommandContextImpl", hooks = {"ArgumentUsageHook"})
+    void test_ArgHook(ArgumentUsageHook hook, Tests tests, CommandContext ctx, AbstractionProvider abstractionManager) {
+        System.out.println(" ⚠ Exclude Argument fields: " + hook.excludeFields);
+        // todo: write actual tests
+        //  rn just manually review the output of println
     }
 
 }
